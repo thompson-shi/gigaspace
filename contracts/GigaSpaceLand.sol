@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URISto
 import "./lib/Signing.sol";
 import "hardhat/console.sol";
 
-contract GigaSpaceLandBase is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable {
+contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     mapping (uint256 => uint256) public _price;
