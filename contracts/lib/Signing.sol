@@ -8,7 +8,7 @@ library Signing {
     ///@param from - address from
     ///@param to - address to
     ///@return message in a form of hash
-    function formMessage(address from, address to, uint256 size, uint256 x, uint256 y) public pure 
+    function formMessage(address from, address to, uint256 size, uint256 x, uint256 y) internal pure 
         returns (bytes32)
     {
         bytes32 message = keccak256(abi.encodePacked(from, to, size, x, y));
