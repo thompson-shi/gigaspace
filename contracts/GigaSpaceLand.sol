@@ -32,16 +32,19 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     uint256 internal constant LAYER_12x12 =    120000000000000;
     uint256 internal constant LAYER_24x24 =    240000000000000;
 
-    mapping (uint256 => uint256) public _landOwners;
-    mapping (uint256 => address) public _newLandOwners;
-    mapping (address => uint256) public _numNFTPerAddress;
+    mapping (uint256 => address) public _landOwners;
 
     address internal _adminSigner;
 
-    mapping(address=>address) internal _signatures;
-
     string internal _baseTokenURI;
 
+    struct Quad {
+        uint256 size;
+        uint256 x;
+        uint256 y;
+    }
+
+    mapping (uint256 => Quad) public _quadObj;
  
     function initialize(address adminSigner, string memory uri) public initializer {
         __ERC721_init("GigaSpace", "GIS");
@@ -116,19 +119,24 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require(msg.value >= _price[size], "Insufficient payment");
 
         uint256 quadId = _formQuadId(size, x, y);
-
         uint256 landId;
         uint256 xNew = x; 
         uint256 yNew = y; 
-
+    
         //Assign all the landIds to _landOwners, if 1x1, no need
-        if (size > 1) {
+        if (size == 1) {
+                    require(_quadOwnerOf(x, y) == address(0), "Land had quad owner");
+                    require(_landOwnerOf(x, y) == address(0), "Land had land owner");
+        } else {
             for (uint256 i = 0; i < size*size; i++) {
                     landId = xNew + yNew * MAP_SIZE;
 
+                    require(_quadOwnerOf(xNew, yNew) == address(0), "Land had quad owner");
+                    require(_landOwnerOf(xNew, yNew) == address(0), "Land had land owner");
+
                     //Reserve [0] for quadId assiging to _landOwners
                     if (i != 0)
-                        _landOwners[landId] = uint256(uint160(address(to)));
+                        _landOwners[landId] = to;
                     
                     if ((i+1) % size == 0) {
                         yNew += 1;
@@ -139,11 +147,14 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         }    
         //For any size of land, mint 1 ERC721 token only by quadId
         _safeMint(to, quadId, landUri);
-        _landOwners[quadId] = uint256(uint160(address(to)));
-        _numNFTPerAddress[to] += size * size;
+        _landOwners[quadId] = to;
+        _quadObj[quadId].size = size;
+        _quadObj[quadId].x = x;
+        _quadObj[quadId].y = y;
+
     }
 
-    function _formQuadId(uint256 size, uint256 x, uint256 y) internal pure returns (uint256) {
+    function _formQuadId(uint256 size, uint256 x, uint256 y) public pure returns (uint256) {
         uint256 id = x + y * MAP_SIZE;
         uint256 quadId;
 
@@ -161,7 +172,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
             require(false, "Invalid size");
         }
         return quadId;
-
     }
 
     /// @notice Degroup the quad to 1x1
@@ -184,17 +194,19 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 yNew = scaleXY(y); 
 
         _burn(erc721Id);
-        _landOwners[quadId] = 0;
-
-        _numNFTPerAddress[to] -= 1;
-
-       for (uint256 i = 0; i < size*size; i++) {
+        _landOwners[quadId] = address(0);
+        delete _quadObj[quadId];
+        
+        for (uint256 i = 0; i < size*size; i++) {
 
              landId = LAYER_1x1 + xNew + yNew * MAP_SIZE;
         
              _safeMint(to, landId, landUri[i]);
 
-            _landOwners[landId] = uint256(uint160(address(to)));
+            _landOwners[landId] = to;
+            _quadObj[landId].size = size;
+            _quadObj[landId].x = xNew;
+            _quadObj[landId].y = yNew;
             
             if ((i+1) % size == 0) {
                 yNew += 1;
@@ -202,7 +214,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
             } else 
                 xNew += 1; 
         }
-        _numNFTPerAddress[to] -= size * size;
     }        
 
     function _safeMint(address to, uint256 tokenId, string memory uri) internal {
@@ -221,38 +232,13 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require(to != address(0), "can't send to zero address");
         
         _transferQuad(from, to, size, scaleXY(x), scaleXY(y));
-        _numNFTPerAddress[from] -= size * size;
-        _numNFTPerAddress[to] += size * size;
-
     }
 
     function _transferQuad(address from, address to, uint256 size, uint256 x, uint256 y) internal {
-
-        require(_quadOwnerOf(size, x, y) == from, "Quad land is not owner");
+        require(_quadOwnerOf(x, y) == from, "Quad land is not owner");
 
         uint256 quadId = _formQuadId(size, x, y);
-
-        if (size > 1) {
-            uint256 xNew = x; 
-            uint256 yNew = y; 
-            uint256 landId;
-            
-            for (uint256 i = 0; i < size*size; i++) {
-                    landId = xNew + yNew * MAP_SIZE;                
-                    
-                    // Start from xNew+1, because 1st land is quadId
-                    if (i > 0)
-                        _landOwners[landId] = uint256(uint160(address(to)));
-                    
-                    if ((i+1) % size == 0) {
-                        yNew += 1;
-                        xNew = x;
-                    } else 
-                        xNew += 1; 
-            }
-        }
-        _landOwners[quadId] = uint256(uint160(address(to)));
-        safeTransferFrom(from, to, quadId);
+        safeTransferFrom(from, to, quadId, "");
     }    
 
     function scaleLandOwnerOf(int256 x, int256 y) public view returns (address) {
@@ -261,23 +247,32 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
     function _landOwnerOf(uint256 x, uint256 y) internal view returns (address) {
         uint256 landId = x + y * MAP_SIZE;
-        return address(uint160(uint256(_landOwners[landId])));
+        return _landOwners[landId];
     }
 
-    function scaleQuadOwnerOf(uint256 size, int256 x, int256 y) public view returns (address) {
+    function scaleQuadOwnerOf(int256 x, int256 y) public view returns (address) {
         uint256 scaleX = scaleXY(x);
         uint256 scaleY = scaleXY(y);
-        return _quadOwnerOf(size, scaleX, scaleY);
+        return _quadOwnerOf(scaleX, scaleY);
     }
 
-    function _quadOwnerOf(uint256 size, uint256 x, uint256 y) internal view returns (address) {    
-        uint256 quadId = _formQuadId(size, x, y);
-        
-        return _quadAdd(quadId);
-    }
+    function _quadOwnerOf(uint256 x, uint256 y) internal view returns (address) {    
+            if (_landOwners[_formQuadId(1, x, y)] != address(0)) {
+                    return _landOwners[_formQuadId(1, x, y)];
 
-    function _quadAdd(uint256 quadId) public view returns (address) {
-        return address(uint160(uint256(_landOwners[quadId])));
+            } else if (_landOwners[_formQuadId(3, x, y)] != address(0)) {
+                    return _landOwners[_formQuadId(3, x, y)];            
+
+            } else if (_landOwners[_formQuadId(6, x, y)] != address(0)) {
+                    return _landOwners[_formQuadId(6, x, y)];            
+
+            } else if (_landOwners[_formQuadId(12, x, y)] != address(0)) {
+                    return _landOwners[_formQuadId(12, x, y)];            
+
+            } else if (_landOwners[_formQuadId(24, x, y)] != address(0)) {
+                    return _landOwners[_formQuadId(24, x, y)];            
+            }
+            return address(0);
     }
 
     ///@notice checks the signature
@@ -285,10 +280,34 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     ///@param userTo - user receiver of the signature
     ///@param signature - bytes with the signed message
     function _processSignature(address userFrom, address userTo, uint256 size, uint256 x, uint256 y, bytes memory signature) internal pure returns (bool) {
-        
         bytes32 message = Signing.formMessage(userFrom, userTo, size, x, y);
         require(userFrom == Signing.recoverAddress(message, signature), "Invalid signature provided");
         return true;
+    }
+
+    function burn(uint256 tokenId, uint256 size, int256 x, int256 y) external onlyRole(DEFAULT_ADMIN_ROLE) {       
+        uint256 landX = scaleXY(x); 
+        uint256 landY = scaleXY(y); 
+        uint256 landId;
+
+        _landOwners[_formQuadId(size, landX, landY)] = address(0);
+        if (size > 1) {
+            for (uint256 i = 0; i < size*size; i++) {
+                    landId = landX + landY * MAP_SIZE;
+
+                    //[0] is quadId, already reset
+                    if (i != 0)
+                        _landOwners[landId] = address(0);
+                    
+                    if ((i+1) % size == 0) {
+                        landY += 1;
+                        landX = scaleXY(x);
+                    } else 
+                        landX += 1; 
+            }
+        }    
+        _burn(tokenId);
+        delete _quadObj[tokenId];
     }
 
     function _burn(uint256 tokenId)
@@ -304,6 +323,45 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
+    }
+
+    /**
+     * @dev See {IERC721-safeTransferFrom}.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) public virtual override {
+        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: transfer caller is not owner nor approved");
+
+        uint256 size = _quadObj[tokenId].size;
+        uint256 x    = _quadObj[tokenId].x;
+        uint256 y    = _quadObj[tokenId].y;
+        uint256 quadId = tokenId;
+
+        if (size > 1) {
+            uint256 xNew = x; 
+            uint256 yNew = y; 
+            uint256 landId;
+            
+            for (uint256 i = 0; i < size*size; i++) {
+                    landId = xNew + yNew * MAP_SIZE;                
+                    
+                    // Start from xNew+1, because 1st land is quadId
+                    if (i > 0)
+                        _landOwners[landId] = to;
+                    
+                    if ((i+1) % size == 0) {
+                        yNew += 1;
+                        xNew = x;
+                    } else 
+                        xNew += 1; 
+            }            
+            _landOwners[quadId] = to;
+        }
+        _safeTransfer(from, to, tokenId, _data);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
