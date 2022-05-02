@@ -4,7 +4,6 @@ const adminSigner = process.env.ADMIN_SIGNER;
 const uri = "https://gateway.pinata.cloud/ipfs/";
 const { deployProxy } = require('@openzeppelin/truffle-upgrades');
 const { ethers, upgrades } = require("hardhat");
-const { ethers } = require("hardhat");
 
 async function main() {
    
