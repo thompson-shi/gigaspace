@@ -400,8 +400,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
                     } else 
                         xNew += 1; 
             }            
-            _landOwners[quadId] = to;
         }
+        _landOwners[quadId] = to;
         _safeTransfer(from, to, tokenId, _data);
     }
 
