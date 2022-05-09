@@ -198,9 +198,10 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
         uint256 quadId = _formQuadId(size, scaleXY(x), scaleXY(y));
 
-        require(to != address(0), "to is zero address");
+        require(to != address(0), "To is zero address");
         require(size > 1, "Only quad can degroup");
         require(quadId == erc721Id, "Invalid ERC721 token ID");
+        require(_landOwners[erc721Id] == to, "Only owner can degroup the quad with burn");
    
         uint256 totalRun = (size * size)/totalBatch;
         uint256 landId;
@@ -218,7 +219,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
             landId = LAYER_1x1 + xNew + yNew * MAP_SIZE;
             _safeMint(to, landId, landUri[i]);
             _landOwners[landId] = to;
-            _quadObj[landId].size = size;
+            _quadObj[landId].size = 1;
             _quadObj[landId].x = xNew;
             _quadObj[landId].y = yNew;
             
