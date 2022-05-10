@@ -14,7 +14,6 @@ import "hardhat/console.sol";
 
 contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable, ReentrancyGuardUpgradeable {
     bytes32 public constant PAUSER_ROLE     = keccak256("PAUSER_ROLE");
-    bytes32 public constant MINTER_ROLE     = keccak256("MINTER_ROLE");
     bytes32 public constant QUAD_ADMIN_ROLE = keccak256("QUAD_ADMIN_ROLE");
     mapping (uint256 => uint256) public _price;
 
@@ -59,7 +58,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(QUAD_ADMIN_ROLE, msg.sender);
 
         _adminSigner = adminSigner;
@@ -235,27 +233,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     function _safeMint(address to, uint256 tokenId, string memory uri) internal {
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
-    }
-
-    /// @notice transfer quad with lands to destination
-    /// @param from current owner of the quad
-    /// @param to destination
-    /// @param size size of the quad
-    /// @param x The bottom left x coordinate of the quad
-    /// @param y The bottom left y coordinate of the quad
-    function transferQuad(address from, address to, uint256 size, int256 x, int256 y) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(from != address(0), "from is zero address");
-        require(to != address(0), "can't send to zero address");
-        
-        _transferQuad(from, to, size, scaleXY(x), scaleXY(y));
-    }
-
-    function _transferQuad(address from, address to, uint256 size, uint256 x, uint256 y) internal {
-        require(_quadOwnerOf(x, y) == from, "Quad land is not owner");
-
-        uint256 quadId = _formQuadId(size, x, y);
-        safeTransferFrom(from, to, quadId, "");
-    }    
+    }   
 
     function scaleLandOwnerOf(int256 x, int256 y) public view returns (address) {
         return _landOwnerOf(scaleXY(x), scaleXY(y));
@@ -385,9 +363,9 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     ) public virtual override {
         require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: transfer caller is not owner nor approved");
 
-        uint256 size = _quadObj[tokenId].size;
-        uint256 x    = _quadObj[tokenId].x;
-        uint256 y    = _quadObj[tokenId].y;
+        uint256 size   = _quadObj[tokenId].size;
+        uint256 x      = _quadObj[tokenId].x;
+        uint256 y      = _quadObj[tokenId].y;
         uint256 quadId = tokenId;
 
         if (size > 1) {
