@@ -8,10 +8,11 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./lib/Signing.sol";
 import "hardhat/console.sol";
 
-contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable {
+contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable, ReentrancyGuardUpgradeable {
     bytes32 public constant PAUSER_ROLE     = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE     = keccak256("MINTER_ROLE");
     bytes32 public constant QUAD_ADMIN_ROLE = keccak256("QUAD_ADMIN_ROLE");
@@ -106,12 +107,12 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _requireCheck = check;
     }
 
-    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public payable callerIsUser {
+    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable callerIsUser {
         require(_phase == SalePhase.PrivateSale, "Private phase is not active");
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public payable callerIsUser {
+    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable callerIsUser {
         require(_phase == SalePhase.PublicSale, "Public phase is not active");
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
@@ -327,12 +328,18 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         return true;
     }
 
-    function burn(uint256 tokenId, uint256 size, int256 x, int256 y) external onlyRole(DEFAULT_ADMIN_ROLE) {       
-        uint256 landX = scaleXY(x); 
-        uint256 landY = scaleXY(y); 
+    function burn(uint256 tokenId) 
+        public
+        virtual
+        override(ERC721BurnableUpgradeable)
+        onlyRole(DEFAULT_ADMIN_ROLE)   
+    {
+        uint256 size     = _quadObj[tokenId].size;
+        uint256 landX    = _quadObj[tokenId].x;
+        uint256 landY    = _quadObj[tokenId].y;
         uint256 landId;
 
-        _landOwners[_formQuadId(size, landX, landY)] = address(0);
+        _landOwners[tokenId] = address(0);
         if (size > 1) {
             for (uint256 i = 0; i < size*size; i++) {
                     landId = landX + landY * MAP_SIZE;
@@ -343,7 +350,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
                     
                     if ((i+1) % size == 0) {
                         landY += 1;
-                        landX = scaleXY(x);
+                        landX = _quadObj[tokenId].x;
                     } else 
                         landX += 1; 
             }
