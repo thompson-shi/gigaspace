@@ -105,19 +105,24 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _requireCheck = check;
     }
 
-    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable callerIsUser {
+    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable {
         require(_phase == SalePhase.PrivateSale, "Private phase is not active");
+        require(!isContract(msg.sender), "Contract as user is not allowed");        
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable callerIsUser {
+    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable {
         require(_phase == SalePhase.PublicSale, "Public phase is not active");
+        require(!isContract(msg.sender), "Contract as user is not allowed");
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
-    
-    modifier callerIsUser() {
-        require(tx.origin == msg.sender, "Contract as user is not allowed");
-        _;
+
+    function isContract(address _addr) private view returns (bool){
+        uint32 size;
+        assembly {
+            size := extcodesize(_addr)
+        }
+        return (size > 0);
     }
 
     function mintLand(address to, uint256 size, uint256 x, uint256 y, string memory landUri, bytes memory signature) internal {
@@ -213,9 +218,14 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
             delete _quadObj[quadId];
         }    
 
-        for (uint256 i = 0; i < totalRun; i++) {
+        for (uint256 i = 0; i < totalRun; i++) {            
+            landId = xNew + yNew * MAP_SIZE;
 
-            landId = LAYER_1x1 + xNew + yNew * MAP_SIZE;
+            // Clear the old landId from xNew+1 (1st land is quadId)
+            if (i > 0)
+                _landOwners[landId] = address(0);
+
+            landId = LAYER_1x1 + landId;
             _safeMint(to, landId, landUri[i]);
             _landOwners[landId] = to;
             _quadObj[landId].size = 1;
