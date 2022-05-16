@@ -47,6 +47,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     bool _requireCheck = true;
 
     function initialize(address adminSigner, string memory uri) public initializer {
+        require(adminSigner != address(0), "adminSigner is zero address");
+
         __ERC721_init("GigaSpace", "GIS");
         __ERC721URIStorage_init();
         __Pausable_init();
