@@ -15,7 +15,6 @@ import "hardhat/console.sol";
 contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable, AccessControlUpgradeable, ERC721BurnableUpgradeable, ERC721URIStorageUpgradeable, ReentrancyGuardUpgradeable {
     bytes32 public constant PAUSER_ROLE     = keccak256("PAUSER_ROLE");
     bytes32 public constant QUAD_ADMIN_ROLE = keccak256("QUAD_ADMIN_ROLE");
-    mapping (uint256 => uint256) public _price;
 
     enum SalePhase {
 		Locked,
@@ -25,18 +24,18 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
     SalePhase public _phase;
 
-    uint256 internal constant MAP_SIZE = 504;
-
+    uint256 internal constant MAP_SIZE    =         504;
     uint256 internal constant LAYER_1x1   =    10000000;
     uint256 internal constant LAYER_3x3   =    30000000;
     uint256 internal constant LAYER_6x6   =    60000000;
     uint256 internal constant LAYER_12x12 =    12000000;
     uint256 internal constant LAYER_24x24 =    24000000;
 
+    mapping (uint256 => uint256) public _price;
     mapping (uint256 => address) public _landOwners;
-
+    mapping (uint256 => Quad)    public _quadObj;
+    
     address internal _adminSigner;
-
     string internal _baseTokenURI;
 
     struct Quad {
@@ -44,8 +43,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 x;
         uint256 y;
     }
-
-    mapping (uint256 => Quad) public _quadObj;
 
     bool _requireCheck = true;
 
@@ -75,7 +72,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     }
 
     /// @notice Set the land price of 5 layers
-    function setPrice(uint256 layer, uint256 price) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setPrice(uint256 layer, uint256 price) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _price[layer] = price;
     }
 
@@ -105,19 +102,19 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _requireCheck = check;
     }
 
-    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable {
+    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable {
         require(_phase == SalePhase.PrivateSale, "Private phase is not active");
         require(!isContract(msg.sender), "Contract as user is not allowed");        
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) public nonReentrant payable {
+    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable {
         require(_phase == SalePhase.PublicSale, "Public phase is not active");
         require(!isContract(msg.sender), "Contract as user is not allowed");
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function isContract(address _addr) private view returns (bool){
+    function isContract(address _addr) private view returns (bool) {
         uint32 size;
         assembly {
             size := extcodesize(_addr)
@@ -132,7 +129,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require(msg.value >= _price[size], "Insufficient payment");
 
         uint256 quadId = _formQuadId(size, x, y);
-
         uint256 landId;
         uint256 xNew = x; 
         uint256 yNew = y; 
@@ -196,8 +192,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     /// @param x The bottom left x coordinate of the quad
     /// @param y The bottom left y coordinate of the quad
     /// @param landUri All degrouped token URIs
-    /// @param batch, batch no. from 0, e.g. 0-3
-    /// @param totalBatch, total batch, e.g. 4
+    /// @param batch batch no. from 0, e.g. 0-3
+    /// @param totalBatch total batch, e.g. 4
     function degroupLand(uint256 erc721Id, address to, uint256 size, int256 x, int256 y, string[] memory landUri, uint256 batch, uint256 totalBatch) external onlyRole(QUAD_ADMIN_ROLE) {
 
         uint256 quadId = _formQuadId(size, scaleXY(x), scaleXY(y));
@@ -245,7 +241,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _setTokenURI(tokenId, uri);
     }   
 
-    function scaleLandOwnerOf(int256 x, int256 y) public view returns (address) {
+    function scaleLandOwnerOf(int256 x, int256 y) external view returns (address) {
         return _landOwnerOf(scaleXY(x), scaleXY(y));
     }    
 
@@ -254,7 +250,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         return _landOwners[landId];
     }
 
-    function scaleQuadOwnerOf(int256 x, int256 y) public view returns (address) {
+    function scaleQuadOwnerOf(int256 x, int256 y) external view returns (address) {
         uint256 scaleX = scaleXY(x);
         uint256 scaleY = scaleXY(y);
         return _quadOwnerOf(scaleX, scaleY);
