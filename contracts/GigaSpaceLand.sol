@@ -127,6 +127,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     function mintLand(address to, uint256 size, uint256 x, uint256 y, string memory landUri, bytes memory signature) internal {
 
         require(to != address(0), "to is zero address");
+        require((MAP_SIZE/2+1000+1) - size >= x && x >= (1000-MAP_SIZE/2+1), "Out of X boundary");
+        require((MAP_SIZE/2+1000+1) - size >= y && y >= (1000-MAP_SIZE/2+1), "Out of Y boundary");
         require(_processSignature(_adminSigner, msg.sender, size, x, y, signature), "Not an authorized address"); 
         require(msg.value >= _price[size], "Insufficient payment");
 
