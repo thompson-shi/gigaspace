@@ -166,7 +166,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _quadObj[quadId].size = size;
         _quadObj[quadId].x = x;
         _quadObj[quadId].y = y;
-
     }
 
     function _formQuadId(uint256 size, uint256 x, uint256 y) public pure returns (uint256) {
@@ -212,8 +211,12 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 xNew = scaleXY(x); 
         uint256 yNew = scaleXY(y) + (size * batch/totalBatch); 
 
+        // When first batch, remove erc721 token. Prevent owner to call safeTransferFrom()
         if (batch == 0) {
             _burn(erc721Id);
+        }    
+        // Until last batch, clear _landOwner[quadId] and _quadObj[quadId]
+        if (batch == totalBatch - 1) {
             _landOwners[quadId] = address(0);
             delete _quadObj[quadId];
         }    
@@ -221,9 +224,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         for (uint256 i = 0; i < totalRun; i++) {            
             landId = xNew + yNew * MAP_SIZE;
 
-            // Clear the old landId from xNew+1 (1st land is quadId)
-            if (i > 0)
-                _landOwners[landId] = address(0);
+            // Clear the old landId
+            _landOwners[landId] = address(0);
 
             landId = LAYER_1x1 + landId;
             _safeMint(to, landId, landUri[i]);
@@ -288,7 +290,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 landId;
 
         require(size > 1, "1x1 is not required");
-        require(_landOwners[erc721Id] == from, "The from should be token owner");
+        require(_landOwners[erc721Id] == from, "The FROM should be token owner");
             
             for (uint256 i = 0; i < size*size; i++) {
                     landId = xNew + yNew * MAP_SIZE;                
