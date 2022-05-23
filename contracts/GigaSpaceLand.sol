@@ -104,24 +104,19 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _requireCheck = check;
     }
 
-    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable {
+    function privateMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable callerIsUser {
         require(_phase == SalePhase.PrivateSale, "Private phase is not active");
-        require(!isContract(msg.sender), "Contract as user is not allowed");        
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable {
+    function publicMint(address to, uint256 size, int256 x, int256 y, string memory uri, bytes memory signature) external nonReentrant payable callerIsUser {
         require(_phase == SalePhase.PublicSale, "Public phase is not active");
-        require(!isContract(msg.sender), "Contract as user is not allowed");
         mintLand(to, size, scaleXY(x), scaleXY(y), uri, signature);
     }    
 
-    function isContract(address _addr) private view returns (bool) {
-        uint32 size;
-        assembly {
-            size := extcodesize(_addr)
-        }
-        return (size > 0);
+    modifier callerIsUser() {
+        require(tx.origin == msg.sender, "Contract as user is not allowed");
+        _;
     }
 
     function mintLand(address to, uint256 size, uint256 x, uint256 y, string memory landUri, bytes memory signature) internal {
@@ -205,7 +200,9 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require(size > 1, "Only quad can degroup");
         require(quadId == erc721Id, "Invalid ERC721 token ID");
         require(_landOwners[erc721Id] == to, "Only owner can degroup the quad with burn");
-   
+        require(totalBatch > 0, "totalBatch must be > 0");
+        require(size*size % totalBatch == 0, "size*size must be divisiable by totalBatch");
+
         uint256 totalRun = (size * size)/totalBatch;
         uint256 landId;
         uint256 xNew = scaleXY(x); 
@@ -281,31 +278,21 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
             return address(0);
     }
 
+    /// @notice Sync the _landOwners object when the marketplaces like Opensea who triggers the Transfer event directly
+    /// @param erc721Id the ERC721 token ID on chain
+    /// @param from quad owner
+    /// @param to trader
     function transferQuadObject(uint256 erc721Id, address from, address to) external onlyRole(QUAD_ADMIN_ROLE) {
         uint256 size = _quadObj[erc721Id].size;
         uint256 x    = _quadObj[erc721Id].x;
         uint256 y    = _quadObj[erc721Id].y;
-        uint256 xNew = x; 
-        uint256 yNew = y; 
-        uint256 landId;
 
-        require(size > 1, "1x1 is not required");
-        require(_landOwners[erc721Id] == from, "The FROM should be token owner");
-            
-            for (uint256 i = 0; i < size*size; i++) {
-                    landId = xNew + yNew * MAP_SIZE;                
-                    
-                    // Start from xNew+1, because 1st land is quadId
-                    if (i > 0)
-                        _landOwners[landId] = to;
-                    
-                    if ((i+1) % size == 0) {
-                        yNew += 1;
-                        xNew = x;
-                    } else 
-                        xNew += 1; 
-            }
-            _landOwners[erc721Id] = to;
+        require(_landOwners[erc721Id] == from, "The param from should be token owner");
+
+        if (size > 1)
+            reassignAllLand(to, size, x, y);                        
+        
+        _landOwners[erc721Id] = to;
     }
 
     ///@notice checks the signature
@@ -364,6 +351,27 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _unpause();
     }
 
+    function reassignAllLand(address to, uint256 size, uint256 x, uint256 y) internal {
+
+            uint256 xNew = x; 
+            uint256 yNew = y; 
+            uint256 landId;
+            
+            for (uint256 i = 0; i < size*size; i++) {
+                    landId = xNew + yNew * MAP_SIZE;                
+                    
+                    // Assign from xNew+1, because 1st land is quadId
+                    if (i > 0)
+                        _landOwners[landId] = to;
+                    
+                    if ((i+1) % size == 0) {
+                        yNew += 1;
+                        xNew = x;
+                    } else 
+                        xNew += 1; 
+            }            
+    }
+
     /**
      * @dev See {IERC721-safeTransferFrom}.
      */
@@ -378,29 +386,36 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 size   = _quadObj[tokenId].size;
         uint256 x      = _quadObj[tokenId].x;
         uint256 y      = _quadObj[tokenId].y;
-        uint256 quadId = tokenId;
 
-        if (size > 1) {
-            uint256 xNew = x; 
-            uint256 yNew = y; 
-            uint256 landId;
-            
-            for (uint256 i = 0; i < size*size; i++) {
-                    landId = xNew + yNew * MAP_SIZE;                
-                    
-                    // Start from xNew+1, because 1st land is quadId
-                    if (i > 0)
-                        _landOwners[landId] = to;
-                    
-                    if ((i+1) % size == 0) {
-                        yNew += 1;
-                        xNew = x;
-                    } else 
-                        xNew += 1; 
-            }            
-        }
-        _landOwners[quadId] = to;
+        if (size > 1)
+            reassignAllLand(to, size, x, y);
+    
+        //tokenId is the ERC721 token ID and also is quadId
+        _landOwners[tokenId] = to;
         _safeTransfer(from, to, tokenId, _data);
+    }
+
+    /**
+     * @dev See {IERC721-transferFrom}.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public virtual override {
+        //solhint-disable-next-line max-line-length
+        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: transfer caller is not owner nor approved");
+
+        uint256 size   = _quadObj[tokenId].size;
+        uint256 x      = _quadObj[tokenId].x;
+        uint256 y      = _quadObj[tokenId].y;
+
+        if (size > 1)
+            reassignAllLand(to, size, x, y);
+
+        //tokenId is the ERC721 token ID and also is quadId
+        _landOwners[tokenId] = to;
+        _transfer(from, to, tokenId);
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
