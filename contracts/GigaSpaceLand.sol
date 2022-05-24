@@ -201,7 +201,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require(quadId == erc721Id, "Invalid ERC721 token ID");
         require(_landOwners[erc721Id] == to, "Only owner can degroup the quad with burn");
         require(totalBatch > 0, "totalBatch must be > 0");
-        require(size*size % totalBatch == 0, "size*size must be divisiable by totalBatch");
+        require(size % totalBatch == 0, "size must be divisible by totalBatch");
 
         uint256 totalRun = (size * size)/totalBatch;
         uint256 landId;
@@ -276,23 +276,6 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
                     return _landOwners[_formQuadId(24, x, y)];            
             }
             return address(0);
-    }
-
-    /// @notice Sync the _landOwners object when the marketplaces like Opensea who triggers the Transfer event directly
-    /// @param erc721Id the ERC721 token ID on chain
-    /// @param from quad owner
-    /// @param to trader
-    function transferQuadObject(uint256 erc721Id, address from, address to) external onlyRole(QUAD_ADMIN_ROLE) {
-        uint256 size = _quadObj[erc721Id].size;
-        uint256 x    = _quadObj[erc721Id].x;
-        uint256 y    = _quadObj[erc721Id].y;
-
-        require(_landOwners[erc721Id] == from, "The param from should be token owner");
-
-        if (size > 1)
-            reassignAllLand(to, size, x, y);                        
-        
-        _landOwners[erc721Id] = to;
     }
 
     ///@notice checks the signature
