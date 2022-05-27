@@ -46,6 +46,10 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
     bool _requireCheck = true;
 
+    event NewPrice(uint256 layer, uint256 price);
+    event BaseTokenURI(string uri);
+    event EnterPhase(SalePhase phase);
+
     function initialize(address adminSigner, string memory uri) public initializer {
         require(adminSigner != address(0), "adminSigner is zero address");
 
@@ -69,18 +73,21 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     }
 
     /// @notice Set IPFS base URI
-    function setBaseTokenURI(string memory uri) external onlyRole(DEFAULT_ADMIN_ROLE)  {
+    function setBaseTokenURI(string memory uri) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _baseTokenURI = uri;
+        emit BaseTokenURI(uri);
     }
 
     /// @notice Set the land price of 5 layers
     function setPrice(uint256 layer, uint256 price) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _price[layer] = price;
+        emit NewPrice(layer, price);
     }
 
 	/// @notice Set the sale phase state 
     function enterPhase(SalePhase phase) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _phase = phase;
+        emit EnterPhase(phase);
     }
 
     /// @notice total width of the map
@@ -399,6 +406,11 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         //tokenId is the ERC721 token ID and also is quadId
         _landOwners[tokenId] = to;
         _transfer(from, to, tokenId);
+    }
+
+    function withdrawBal() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
+        (bool success, ) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Transfer failed");
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
