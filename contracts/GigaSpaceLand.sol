@@ -31,6 +31,8 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
     uint256 internal constant LAYER_12x12 =    12000000;
     uint256 internal constant LAYER_24x24 =    24000000;
 
+    uint256 internal constant MAX_PRICE = 100000000000000000000;
+
     mapping (uint256 => uint256) public _price;
     mapping (uint256 => address) public _landOwners;
     mapping (uint256 => Quad)    public _quadObj;
@@ -80,6 +82,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
 
     /// @notice Set the land price of 5 layers
     function setPrice(uint256 layer, uint256 price) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(MAX_PRICE >= price, "Out of max price");
         _price[layer] = price;
         emit NewPrice(layer, price);
     }
@@ -132,7 +135,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         require((MAP_SIZE/2+1000+1) - size >= x && x >= (1000-MAP_SIZE/2+1), "Out of X boundary");
         require((MAP_SIZE/2+1000+1) - size >= y && y >= (1000-MAP_SIZE/2+1), "Out of Y boundary");
         require(_processSignature(_adminSigner, msg.sender, size, x, y, signature), "Not an authorized address"); 
-        require(msg.value >= _price[size], "Insufficient payment");
+        require(msg.value == _price[size], "Payment must be equal to the Price");
 
         uint256 quadId = _formQuadId(size, x, y);
         uint256 landId;
