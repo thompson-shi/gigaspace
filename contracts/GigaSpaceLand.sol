@@ -46,7 +46,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         uint256 y;
     }
 
-    bool _requireCheck = true;
+    bool _requireCheck;
 
     event NewPrice(uint256 layer, uint256 price);
     event BaseTokenURI(string uri);
@@ -68,6 +68,7 @@ contract GigaSpaceLand is Initializable, ERC721Upgradeable, PausableUpgradeable,
         _adminSigner = adminSigner;
         _baseTokenURI = uri;
         _phase = SalePhase.Locked;
+        _requireCheck = true;
     }
     
     function _baseURI() internal view override returns (string memory) {
